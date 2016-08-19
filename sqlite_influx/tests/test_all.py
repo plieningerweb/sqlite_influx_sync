@@ -1,9 +1,9 @@
 import unittest as unittest
 import datetime
-
-from sqlite_influx import sqlite, influx
+import dateutil
 
 import sqlite_influx.Config as Config
+from sqlite_influx import sqlite, influx
 
 class HighlevelTest(unittest.TestCase):
     measurement = 'test_measurement'
@@ -11,14 +11,17 @@ class HighlevelTest(unittest.TestCase):
         'channel1': 123.2,
         'channel2': 22.4
     }
-    tags = {
-        'server': 'test',
-        'tag2': 'value2'
-    }
-    time_future = datetime.datetime(2099, 01, 01)
+    tags = Config.config['tags']
+    time_future = datetime.datetime.utcnow() + \
+        datetime.timedelta(days=7)
+    # parse again so we always get same timestamp as from influxdb
+    time_future = dateutil.parser.parse(time_future.isoformat()[0:16])
 
     def setUp(self):
-        Config.config['engine'] = 'sqlite:///:memory:'
+        # setup database in influx
+        # first clean then create
+        influx.client.drop_database(Config.config['influx']['dbname'])
+        influx.client.create_database(Config.config['influx']['dbname'])
 
     def store_item(self, time):
         sqlite.store(self.measurement, self.tags,
@@ -45,8 +48,7 @@ class HighlevelTest(unittest.TestCase):
         self.assertEqual(affected, 10)
 
     def step5_get_latest_empty(self):
-        res = influx.get_latest_measurement(self.measurement,
-            self.tags)
+        res = influx.get_latest_measurement(self.tags)
         self.assertEqual(res, -1)
 
     def step6_sync(self):
@@ -54,16 +56,35 @@ class HighlevelTest(unittest.TestCase):
         time = self.time_future
         self.store_item(time)
 
-        self.influx_sync()
+        count = sqlite.sync_to_influx()
+        self.assertEqual(count, 21)
 
     def step8_get_latest_found(self):
-        res = influx.get_latest_measurement(self.measurement,
-            self.tags)
+        res = influx.get_latest_measurement(self.tags)
+        print(res)
+        print(self.time_future)
         self.assertEqual(res, self.time_future)
 
+    def step9_sync_emtpy(self):
+        count = sqlite.sync_to_influx()
+        self.assertEqual(count, 0)
 
-    def influx_sync(self):
-        pass
+    def step10_sync_nodb(self):
+        influx.client.drop_database(Config.config['influx']['dbname'])
+
+        count = sqlite.sync_to_influx()
+        # should fail
+        self.assertEqual(count, -1)
+
+    def step11_store_dicts(self):
+        dicts = {
+            self.measurement: self.example_data,
+            self.measurement + '2': self.example_data
+        }
+        sqlite.store_dicts(dicts)
+
+    def step99_example_app(self):
+        from sqlite_influx import example_app
 
     def test_all(self):
         self.step1_store()
@@ -72,20 +93,8 @@ class HighlevelTest(unittest.TestCase):
         self.step5_get_latest_empty()
         self.step6_sync()
         self.step8_get_latest_found()
+        self.step9_sync_emtpy()
+        self.step10_sync_nodb()
+        self.step11_store_dicts()
 
-    def something():
-        stats_body = [
-            {
-                "measurement": "monitor-opcua-server",
-                "tags": {
-                    "host": "iot1",
-                    "monitor-server": "pvlern"
-                },
-                #time always in utc
-                "time":  datetime.datetime.utcnow(),
-                "fields": {
-                    #1 for up / ok
-                    "value": 1
-                }
-            }
-        ]
+        self.step99_example_app()
