@@ -1,0 +1,12 @@
+archive_older_than_days: 30
+# path to sqlite database
+engine: "sqlite:///:memory:"
+influx:
+  dbname: pv-nodes
+  host: localhost
+  password: no-need
+  port: 8086
+  user: no-need
+tags:
+  host: testhost.de
+  region: europe

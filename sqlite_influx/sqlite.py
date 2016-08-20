@@ -25,7 +25,7 @@ class History(Base):
     unix_timestamp = Column(Integer)
 
 #Create the database
-engine = create_engine(Config.config['engine'], echo=True)
+engine = create_engine(Config.config['engine'], echo=False)
 Base.metadata.create_all(engine)
 
 #Create the session
@@ -44,10 +44,11 @@ def store(measurement, tags, time, fields):
     try:
         session.add(record)
         session.commit()
-        logger.info("Stored {} ({})".format(measurement, time.isoformat()))
+        logger.info("Stored measurement {} ({})".format(measurement,
+            time.isoformat()))
     except:
         session.rollback()
-        logger.error("Could not store {} ({})".format(measurement,
+        logger.exception("Could not store measurement {} ({})".format(measurement,
             time.isoformat()))
         raise
     finally:
@@ -92,7 +93,7 @@ def archive(older_than_days):
 
         return affected_rows
     except Exception:
-        logger.error("Could not archive data {} days back".format(
+        logger.exception("Could not archive data {} days back".format(
             older_than_days))
         raise
 
@@ -135,7 +136,6 @@ def sync_to_influx():
 
         return len(data)
     except Exception as e:
-        logger.error("sync to influx failed")
-        logger.error(str(e))
+        logger.exception("sync to influx failed")
 
     return -1

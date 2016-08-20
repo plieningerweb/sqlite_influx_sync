@@ -1,9 +1,23 @@
 """example layer of how to use sqlite_influx
 in an app"""
 
-from sqlite_influx import Config, sqlite
+import yaml
+import logging
+from sqlite_influx import Config
 
+# setup logging
+logging.basicConfig(level=logging.INFO)
 
+# setup config first, before we import the other stuff
+with open('config.yaml', 'r') as stream:
+    config_yaml = yaml.load(stream)
+Config.config.update(config_yaml)
+
+# now import helpers, which initialize database
+# based on config data
+from sqlite_influx import sqlite
+
+# get measurements, e.g. from a sensor reading
 measurements = {
     'test1': {
         'field1': 'data1',
@@ -14,6 +28,7 @@ measurements = {
     }
 }
 
+# store measurements
 sqlite.store_dicts(measurements)
 
 sqlite.sync_to_influx()
